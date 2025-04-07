@@ -44,23 +44,55 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 class SimpleNet(nn.Module):
     def __init__(self):
         super(SimpleNet, self).__init__()
+        #note that conv2d has parameters (inchannels, outchannles, kernel_size, stride, padding)
+        #in channles is the number of input channels
+        #out channels is the number of output channles, or the number of filters
+        #the kernel size is the size of the filter
+
+        #note that Output size= [(input size + (2xpadding) - kernel size)/stride] + 1
         self.conv1 = nn.Conv2d(3, 32, 3, padding = 1) #first channel must set to 3 for this dataset as it has three color channels
+        #think of the above as 32 cubes, each with depth 3 (first parameter) and height and width 3x3 (third parameter)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 32, 3, padding = 1)
-        self.fc1 = nn.Linear(32 * 8 * 8, 120)
+        self.conv2 = nn.Conv2d(32, 32, 3, padding = 1) #this is 32 filter cubes (2nd parameter) with depth 32 (first parameter) of size 3x3
+        self.fc1 = nn.Linear(32 * 8 * 8, 120) #(infeatures, outfeatures) --> y = Wx + b, this just automatically caluclates the size of W
         self.fc2 = nn.Linear(120, 10)
 
 
     def forward(self, x):
+        #the input x is [N, 3, 32, 32] --> think of this as N cubes with depth 3, height 32, width 32
         x = self.conv1(x)
+        #after conv1 it will keep the height and width due to padding, think of 3 as the depth which dissapears
+        #we know we have 32 filters, so now we get N, 32, _, _ 
+        # Output size= [(input size + (2xpadding) - kernel size)/stride] + 1
+        #output size = [(32 + (2x1) - 3)/1 + 1] = 34-3 + 1 = 32
+        #there are now 32 filters still with 32x32 height and width --> imagine 32 3x3x3 cubes sliding over a 32x32x3 cube
+        #the shape is now [N, 32, 32, 32]
         x = torch.relu(x)
+        #relu is just an activation function max(0,1) so shape is the same [N, 32, 32, 32]
+        #relu is just 
         x = self.pool(x)
+        #note that the formula for maxpool is still Output size= [(input size + (2xpadding) - kernel size)/stride] + 1
+        #in this case: output = (input size - kernel size)/stride +1 since the padding is 0
+        # (32-2)/2 + 1 = 16
+        #the stride is 2 bc the parameters are (kernel size, stride)
+        # output size is [N, 32, 16, 16]
         x = self.conv2(x)
+        # you will get 32 filters, so that fulfills to N, 32, 
+        # input size is 16
+        # (16 + (2*1) - 3)/1 + 1 = 18-3 / 1 + 1 =  15+1 = 16
+        #output size is [N, 32, 16, 16] 
         x = torch.relu(x)
+        #same size, max(0,1) --> [N, 32, 16, 16]
         x = self.pool(x)
+        # (16-2)/2 + 1 = 8 
+        # [N, 32, 8, 8]
         x = x.view(-1, 32 * 8 * 8) #Reshape the convolution output for the FC layers
+        # keeps N the same, --> [N, 2048]
         x = torch.relu(self.fc1(x))
+        # the linear layer self.fc1(x) is just taking the 2048 features and shaping them into 120 features 
+        # [N, 120]
         x = self.fc2(x)
+        #now it is just taking 120 and shaping it to 10 classes or features!
         return x
 
 net = SimpleNet().to(device) #.to(device) send the define neural network to the specified device
