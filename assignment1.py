@@ -117,7 +117,7 @@ net = SimpleNet().to(device) #.to(device) send the define neural network to the 
 """Define the loss function and optimizer. Cross entropy loss is typically the default choice for classification problems. Again you can check Pytorch's documentation to see what optimizers you can use (there are plenty of them). Some common choices are SGD and adam."""
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=0.0001) #0.001 is the default LR for Adam.
+optimizer = optim.Adam(net.parameters(), lr=0.001) #0.001 is the default LR for Adam.
 
 print(net)
 """Train the network. the number of epoch is set to 10 for quicker demonstration. In general you want to train for a bit longer until the network converges."""
