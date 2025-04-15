@@ -79,7 +79,7 @@ class SimpleNet(nn.Module):
 
         x = self.conv3(x)
         x = self.pool(x)
-        s = self.bn3(x)
+        x = self.bn3(x)
         x = torch.relu(x)
 
         #same size, max(0,1) --> [N, 32, 16, 16]
@@ -123,7 +123,7 @@ print(net)
 """Train the network. the number of epoch is set to 10 for quicker demonstration. In general you want to train for a bit longer until the network converges."""
 
 net.train()
-num_epochs = 15
+num_epochs = 12
 for epoch in range(num_epochs):
     start_time = time.time()
     running_loss = 0.0
