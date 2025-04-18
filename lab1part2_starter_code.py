@@ -173,7 +173,7 @@ optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
 # Training function
-def train(epoch):
+def train(model, epoch):
     model.train()
     train_loss = 0
     correct = 0
@@ -201,7 +201,7 @@ def train(epoch):
                   f'Loss: {train_loss/(batch_idx+1):.3f} '
                   f'Train Acc: {100.*correct/total:.3f}%')
 # Testing function
-def test(epoch):
+def test(model, epoch):
     model.eval()
     test_loss = 0
     correct = 0
@@ -229,24 +229,32 @@ model = ResNet8().to(device)
 model.load_state_dict(torch.load("lab1part2.pth", map_location=device))
 
 #Run inference 
-fp_accuracy = test(epoch=0)
+fp_accuracy = test(model, epoch=0)
 print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
 
 
 '''number 2'''
 Conv2dClass = QuantizedConv2d8
+model_qat = ResNet8().to(device)
+fp_weights = torch.load("lab1part2.pth", map_location=device)
+model_qat.load_state_dict(fp_weights, strict=False)
+# Define loss and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model_qat.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+
 # Train the model
 best_acc = 0
 for epoch in range(num_epochs):
-    train(epoch)
-    acc = test(epoch)
+    train(model_qat, epoch)
+    acc = test(model_qat, epoch)
     scheduler.step()
     
     # Save model if better than previous best
     if acc > best_acc:
         print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
         best_acc = acc
-        torch.save(model.state_dict(), 'lab1part2_qat.pth')
+        torch.save(model_qat.state_dict(), 'lab1part2_qat.pth')
 
 print(f'Best test accuracy: {best_acc*100:.2f}%')
 print('Training completed! Model saved as lab1part2_qat.pth')
@@ -261,22 +269,27 @@ else:
 '''number 3'''
       
 # Initialize model for 6 bits, loss function and optimizer
+
 Conv2dClass = QuantizedConv2d6
 model_6bit = ResNet8().to(device)
+model_6bit.load_state_dict(torch.load("lab1part2_qat.pth", map_location=device))
+
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model_6bit.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(model_qat.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+
+# Train the model
 best_acc = 0
 for epoch in range(num_epochs):
-    train(epoch)
-    acc = test(epoch)
+    train(model_6bit, epoch)
+    acc = test(model_6bit, epoch)
     scheduler.step()
     
     # Save model if better than previous best
     if acc > best_acc:
         print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
         best_acc = acc
-        torch.save(model.state_dict(), 'lab1part2_qat.pth')
+        torch.save(model_6bit.state_dict(), 'lab1part2_qat.pth')
 
 print(f'Best test accuracy: {best_acc*100:.2f}%')
 print('Training completed! Model saved as lab1part2_qat.pth')
@@ -287,7 +300,12 @@ elif(Conv2dClass == QuantizedConv2d6):
 else: 
     print("conv2dclass = default model")
 
+
+
+
 # For grading, your QAT inference training script should include these *exact* two lines of code at the end:
 print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
 print(f"8-bit accuracy:{eight_bit_accuracy}")
 print(f"6-bit accuracy:{six_bit_accuracy}")
+
+
