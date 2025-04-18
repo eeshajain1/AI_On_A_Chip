@@ -142,7 +142,7 @@ def ResNet8():
 net = ResNet8().to(device)
 
 # Hyperparameters
-num_epochs = 12
+num_epochs = 50
 batch_size = 128 # you can lower this to 64 or 32 to help speed up training.
 learning_rate = 0.01
 
