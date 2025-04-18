@@ -11,8 +11,7 @@ print(f"Using device: {device}")
 
 class StraightThroughEstimator(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, input):
-        bits = 8 #specify the number of bits here
+    def forward(ctx, input, bits):
         abs_input = input.abs() #we need the abs_input in order to avoid mishandling of negative numbers
         sign = input.sign() #get the sign of the input and reserve one bit for this
         max_quantization_value = 2 ** (bits - 1) - 1 #e.g 3 bits --> 2^2 - 1 = 3 = 11(base 2) with one bit reserved for the sign bit
@@ -27,18 +26,18 @@ class StraightThroughEstimator(torch.autograd.Function):
     def backward(ctx, grad_output):
         # In the backward pass the gradients are returned directly without modification.
         # This is the key step of STE
-        return grad_output
+        return grad_output, None
 
 # To apply the STE
-def apply_ste(x):
-    return StraightThroughEstimator.apply(x)
+def apply_ste(x, bits):
+    return StraightThroughEstimator.apply(x, bits)
 
 # When you want to quantize the weights, call the apply_ste function
 # You need to use this function within the forward pass of your model in a custom Conv2d class.
 
-class QuantizedConv2d(nn.Module):
+class QuantizedConv2d8(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True): 
-        super(QuantizedConv2d, self).__init__()
+        super(QuantizedConv2d8, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, bias=bias )
     def forward(self, x):
           
@@ -46,13 +45,25 @@ class QuantizedConv2d(nn.Module):
         # x = self.conv(x)
         # x = apply_ste(x)
         # return x
-        quantized_weight = apply_ste(self.conv.weight)  
+        quantized_weight = apply_ste(self.conv.weight, bits=8)  
         return F.conv2d(x, quantized_weight, self.conv.bias, self.conv.stride, self.conv.padding)
-
+    
+class QuantizedConv2d6(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True): 
+        super(QuantizedConv2d6, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, bias=bias )
+    def forward(self, x):
+          
+  
+        # x = self.conv(x)
+        # x = apply_ste(x)
+        # return x
+        quantized_weight = apply_ste(self.conv.weight, bits=6)  
+        return F.conv2d(x, quantized_weight, self.conv.bias, self.conv.stride, self.conv.padding)
 
 # To apply quantization and STE, you will need to define a new Conv2d class that will be used to replace the default Conv2d class in the ResNet model.
 # You should follow a similar approach as Lab 1 Part 1.
-Conv2dClass = QuantizedConv2d # Default Conv2d class from pytorch. Replace this line!
+Conv2dClass = QuantizedConv2d8 # this is for the 8 bit training 
 
 
 # The code here is more complicated that it needs to be as it can be used to define multiple ResNet models with different configurations.
@@ -131,7 +142,7 @@ def ResNet8():
 net = ResNet8().to(device)
 
 # Hyperparameters
-num_epochs = 100
+num_epochs = 12
 batch_size = 128 # you can lower this to 64 or 32 to help speed up training.
 learning_rate = 0.01
 
@@ -211,6 +222,19 @@ def test(epoch):
     print(f'Epoch {epoch+1}: Test Acc: {100.*correct/total:.3f}%')
     return correct/total
 
+'''number 1'''
+
+Conv2dClass = nn.Conv2d
+model = ResNet8().to(device)
+model.load_state_dict(torch.load("lab1part2.pth", map_location=device))
+
+#Run inference 
+fp_accuracy = test(epoch=0)
+print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
+
+
+'''number 2'''
+Conv2dClass = QuantizedConv2d8
 # Train the model
 best_acc = 0
 for epoch in range(num_epochs):
@@ -222,12 +246,47 @@ for epoch in range(num_epochs):
     if acc > best_acc:
         print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
         best_acc = acc
-        torch.save(model.state_dict(), 'lab1part2.pth')
+        torch.save(model.state_dict(), 'lab1part2_qat.pth')
 
 print(f'Best test accuracy: {best_acc*100:.2f}%')
-print('Training completed! Model saved as lab1part2.pth')
+print('Training completed! Model saved as lab1part2_qat.pth')
+if(Conv2dClass == QuantizedConv2d8):
+    eight_bit_accuracy = best_acc*100
+elif(Conv2dClass == QuantizedConv2d6):
+    six_bit_accuracy = best_acc*100
+else: 
+    print("conv2dclass = default model")
 
+
+'''number 3'''
+      
+# Initialize model for 6 bits, loss function and optimizer
+Conv2dClass = QuantizedConv2d6
+model_6bit = ResNet8().to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model_6bit.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+best_acc = 0
+for epoch in range(num_epochs):
+    train(epoch)
+    acc = test(epoch)
+    scheduler.step()
+    
+    # Save model if better than previous best
+    if acc > best_acc:
+        print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
+        best_acc = acc
+        torch.save(model.state_dict(), 'lab1part2_qat.pth')
+
+print(f'Best test accuracy: {best_acc*100:.2f}%')
+print('Training completed! Model saved as lab1part2_qat.pth')
+if(Conv2dClass == QuantizedConv2d8):
+    eight_bit_accuracy = best_acc*100
+elif(Conv2dClass == QuantizedConv2d6):
+    six_bit_accuracy = best_acc*100
+else: 
+    print("conv2dclass = default model")
 
 # For grading, your QAT inference training script should include these *exact* two lines of code at the end:
-# print(f"8-bit accuracy:{8_bit_accuracy})
-# print(f"6-bit accuracy:{6_bit_accuracy})
+print(f"8-bit accuracy:{eight_bit_accuracy}")
+print(f"6-bit accuracy:{six_bit_accuracy}")
