@@ -43,11 +43,11 @@ class QuantizedConv2d(nn.Module):
     def forward(self, x):
           
   
-        x = self.conv(x)
-        x = apply_ste(x)
-        return x
-        #quantized_weight = apply_ste(self.conv.weight)  
-        #return F.conv2d(x, quantized_weight, self.conv.bias, self.conv.stride, self.conv.padding)
+        # x = self.conv(x)
+        # x = apply_ste(x)
+        # return x
+        quantized_weight = apply_ste(self.conv.weight)  
+        return F.conv2d(x, quantized_weight, self.conv.bias, self.conv.stride, self.conv.padding)
 
 
 # To apply quantization and STE, you will need to define a new Conv2d class that will be used to replace the default Conv2d class in the ResNet model.
