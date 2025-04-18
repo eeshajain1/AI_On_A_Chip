@@ -288,5 +288,6 @@ else:
     print("conv2dclass = default model")
 
 # For grading, your QAT inference training script should include these *exact* two lines of code at the end:
+print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
 print(f"8-bit accuracy:{eight_bit_accuracy}")
 print(f"6-bit accuracy:{six_bit_accuracy}")
