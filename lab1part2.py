@@ -35,23 +35,32 @@ def apply_ste(x, bits):
 # When you want to quantize the weights, call the apply_ste function
 # You need to use this function within the forward pass of your model in a custom Conv2d class.
 
+def truncate_to_6bit(tensor, trunc_bits=2, num_bits=8):
+    qmin = -2 ** (num_bits-1)
+    qmax = 2 ** (num_bits-1) - 1
+    scale = tensor.abs().max() / qmax
+    int_repr = (tensor / scale).round()     # convert float weights to quantized 8-bit integers but still store as float
+    int_truncated = ((int_repr / (2 ** trunc_bits)).round()) * (2 ** trunc_bits)    # simulate 6-bit resolution
+    return int_truncated * scale    # return 6-bit quantized float weights
+
 # this CustomConv2d quantize the weights to 8 bits such that the same
 # weights can also applied to 6 bits
 class CustomConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, bias=False, num_bits=8, 
-                 trunc_bits=2, percent=0.5):
+                 trunc_bits=2, mode='train_joint', percent=0.5):
         super(CustomConv2d, self).__init__()
         self.num_bits = num_bits
         self.trunc_bits = trunc_bits
         self.percent = percent  # how much weight to distribute, default to 0.5
+        self.mode = mode
         self.conv = nn.Conv2d(
             in_channels, out_channels, kernel_size, stride=stride,
             padding=padding, dilation=dilation, groups=groups, bias=bias
             )
     def forward(self, x):
-        weight_8bit = apply_ste(self.conv.weight, 8)
-        weight_6bit = apply_ste(self.conv.weight, 6)
+        weight_8bit = apply_ste(self.conv.weight, self.num_bits)
+        weight_6bit = truncate_to_6bit(weight_8bit, self.trunc_bits, self.num_bits)
         
         out_8bit = F.conv2d(x, weight_8bit, self.conv.bias,
                             stride=self.conv.stride, padding=self.conv.padding,
@@ -251,83 +260,83 @@ def test(model, epoch):
     print(f'Epoch {epoch+1}: Test Acc: {100.*correct/total:.3f}%')
     return correct/total
 
-# '''number 1 Inference accuracy of pretrained FP network'''
+# # '''number 1 Inference accuracy of pretrained FP network'''
 
-Conv2dClass = nn.Conv2d
-model = ResNet8().to(device)
-model.load_state_dict(torch.load("lab1part2.pth", map_location=device))
+# Conv2dClass = nn.Conv2d
+# model = ResNet8().to(device)
+# model.load_state_dict(torch.load("lab1part2.pth", map_location=device))
 
-# #Run inference 
-fp_accuracy = test(model, epoch=0)
-print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
+# # #Run inference 
+# fp_accuracy = test(model, epoch=0)
+# print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
 
 
-# '''number 2 Accuracy of QAT for pure 8-bit quantization'''
-Conv2dClass = QuantizedConv2d8
-model_qat = ResNet8().to(device)
-fp_weights = torch.load("lab1part2.pth", map_location=device)
-model_qat.load_state_dict(fp_weights, strict=False)
-# Define loss and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model_qat.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+# # '''number 2 Accuracy of QAT for pure 8-bit quantization'''
+# Conv2dClass = QuantizedConv2d8
+# model_qat = ResNet8().to(device)
+# fp_weights = torch.load("lab1part2.pth", map_location=device)
+# model_qat.load_state_dict(fp_weights, strict=False)
+# # Define loss and optimizer
+# criterion = nn.CrossEntropyLoss()
+# optimizer = optim.SGD(model_qat.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+# scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
-# Train the model
-best_acc = 0
-for epoch in range(num_epochs):
-    train(model_qat, epoch)
-    acc = test(model_qat, epoch)
-    scheduler.step()
+# # Train the model
+# best_acc = 0
+# for epoch in range(num_epochs):
+#     train(model_qat, epoch)
+#     acc = test(model_qat, epoch)
+#     scheduler.step()
     
-    # Save model if better than previous best
-    if acc > best_acc:
-        # print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
-        best_acc = acc
-        # torch.save(model_qat.state_dict(), 'lab1part2_qat.pth')
+#     # Save model if better than previous best
+#     if acc > best_acc:
+#         # print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
+#         best_acc = acc
+#         # torch.save(model_qat.state_dict(), 'lab1part2_qat.pth')
 
-print(f'Best test accuracy: {best_acc*100:.2f}%')
-print('Training completed! Model saved as lab1part2_qat.pth')
-if(Conv2dClass == QuantizedConv2d8):
-    eight_bit_accuracy = best_acc*100
-elif(Conv2dClass == QuantizedConv2d6):
-    six_bit_accuracy = best_acc*100
-else: 
-    print("conv2dclass = default model")
-eight_bit_accuracy = best_acc * 100
+# print(f'Best test accuracy: {best_acc*100:.2f}%')
+# print('Training completed! Model saved as lab1part2_qat.pth')
+# if(Conv2dClass == QuantizedConv2d8):
+#     eight_bit_accuracy = best_acc*100
+# elif(Conv2dClass == QuantizedConv2d6):
+#     six_bit_accuracy = best_acc*100
+# else: 
+#     print("conv2dclass = default model")
+# eight_bit_accuracy = best_acc * 100
 
-'''number 3 Accuracy of QAT for pure 6-bit quantization'''
+# '''number 3 Accuracy of QAT for pure 6-bit quantization'''
       
-# Initialize model for 6 bits, loss function and optimizer
+# # Initialize model for 6 bits, loss function and optimizer
 
-Conv2dClass = QuantizedConv2d6
-model_6bit = ResNet8().to(device)
-model_6bit.load_state_dict(torch.load("lab1part2.pth", map_location=device), strict=False)
+# Conv2dClass = QuantizedConv2d6
+# model_6bit = ResNet8().to(device)
+# model_6bit.load_state_dict(torch.load("lab1part2.pth", map_location=device), strict=False)
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model_6bit.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+# criterion = nn.CrossEntropyLoss()
+# optimizer = optim.SGD(model_6bit.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+# scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
-# Train the model
-best_acc = 0
-for epoch in range(num_epochs):
-    train(model_6bit, epoch)
-    acc = test(model_6bit, epoch)
-    scheduler.step()
+# # Train the model
+# best_acc = 0
+# for epoch in range(num_epochs):
+#     train(model_6bit, epoch)
+#     acc = test(model_6bit, epoch)
+#     scheduler.step()
     
-    # Save model if better than previous best
-    if acc > best_acc:
-        # print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
-        best_acc = acc
-        # torch.save(model_6bit.state_dict(), 'lab1part2_qat.pth')
+#     # Save model if better than previous best
+#     if acc > best_acc:
+#         # print(f'Saving model, acc: {acc:.3f} > best_acc: {best_acc:.3f}')
+#         best_acc = acc
+#         # torch.save(model_6bit.state_dict(), 'lab1part2_qat.pth')
 
-print(f'Best test accuracy: {best_acc*100:.2f}%')
-print('Training completed! Model saved as lab1part2_qat.pth')
-six_bit_accuracy = best_acc*100
+# print(f'Best test accuracy: {best_acc*100:.2f}%')
+# print('Training completed! Model saved as lab1part2_qat.pth')
+# six_bit_accuracy = best_acc*100
 
-# For grading, your QAT inference training script should include these *exact* two lines of code at the end:
-print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
-print(f"8-bit accuracy:{eight_bit_accuracy}")
-print(f"6-bit accuracy:{six_bit_accuracy}")
+# # For grading, your QAT inference training script should include these *exact* two lines of code at the end:
+# print(f"Inference accuracy of pretrained FP network: {fp_accuracy*100:.2f}%")
+# print(f"8-bit accuracy:{eight_bit_accuracy}")
+# print(f"6-bit accuracy:{six_bit_accuracy}")
 
 '''number 4 & 5'''
 Conv2dClass = CustomConv2d
@@ -355,7 +364,7 @@ eight_bit_accuracy = best_acc*100
 print('Using our custom methods:')
 print(f'Best test accuracy: {best_acc*100:.2f}%')
 print('Training completed! Model saved as lab1part2_qat.pth')
-print(f"8-bit accuracy:{eight_bit_accuracy}%")
+print(f"8-bit accuracy:{best_acc*100:.2f}%")
 
 # Test the model with 6-bit
 Conv2dClass = QuantizedConv2d6
@@ -366,5 +375,5 @@ model.load_state_dict(torch.load("lab1part2_qat.pth", map_location=device), stri
 # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 #Run inference 
 fp_accuracy = test(model, epoch=0)
-print(f"8-bit accuracy:{eight_bit_accuracy}%")
+print(f"8-bit accuracy:{best_acc*100:.2f}%")
 print(f"6-bit accuracy: {fp_accuracy*100:.2f}%")
