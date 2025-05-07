@@ -52,7 +52,7 @@ def compute_layer_energy(dataflow, batch_size):
             
             #each input is broadcasted throughout the array while each dpu holds  a separate filter
             #it does not matter how many dpus there are because each dpu holds the same input vector
-            #for each row of inputs: (n_channel*kernel_size)/dpu_output_size chunks will be needed
+            #for each row of inputs: (n_channel*kernel_size)/dpu_size chunks will be needed
             #these input chunks are broadcasted in all 16 dpus 
             #the corresponding filter chunks for each filter are streamed in for each input chunk and each dpu can hold a different filter
             #the inputs are only updated after every single filter has passed through, meaning that this leads to a partial sum for num_filter pixels
@@ -61,7 +61,7 @@ def compute_layer_energy(dataflow, batch_size):
             #each valid input chunk can produce n_filter pixels
             
             #just multiply by batch_size here and it propogates to the rest
-            NIBU = math.ceil(n_channel*kernel_size*kernel_size/n_dot_product_units) * math.ceil((H*W)/n_filter) * batch_size
+            NIBU = math.ceil(n_channel*kernel_size*kernel_size/dot_product_unit_size) * math.ceil((H*W)/n_filter) * batch_size
             print(NIBU)
             # NWBU = math.ceil(n_channel*kernel_size*kernel_size/n_dot_product_units) * math.ceil(n_filter/n_dot_product_units) * batch_size
             # print(NWBU)
