@@ -46,9 +46,7 @@ def compute_layer_energy(dataflow, batch_size):
         
 
         if dataflow == 'IS':  #Input Stationary
-            #inputs are only loaded in once, so we do # of inputs / # of dpus and these are stationary
-            #one input per dpu
-            #kind of WS reversed 
+    
             
             #each input is broadcasted throughout the array while each dpu holds  a separate filter
             #it does not matter how many dpus there are because each dpu holds the same input vector
@@ -63,15 +61,15 @@ def compute_layer_energy(dataflow, batch_size):
             #just multiply by batch_size here and it propogates to the rest
             NIBU = math.ceil(n_channel*kernel_size*kernel_size/dot_product_unit_size) * math.ceil((H*W)/n_filter) * batch_size
             print(NIBU)
-            # NWBU = math.ceil(n_channel*kernel_size*kernel_size/n_dot_product_units) * math.ceil(n_filter/n_dot_product_units) * batch_size
+            # NWBU = math.ceil(n_channel*kernel_size*kernel_size/dot_product_unit_size) * math.ceil(n_filter/n_dot_product_units) * batch_size
             # print(NWBU)
             
             #every time we update hte buffer for a valid output pixel, we want to do a dot product, and we do this for each image in the batch
             #each input can only effect 9 -- filter size
             #9 output pixels that depend on input pixel
-            NDPC = NIBU * kernel_size * kernel_size 
+            NDPC = NIBU * n_filter
             
-            ISE = NIBU * n_dot_product_units * dot_product_unit_size * activation_bitwidth * SRAM_access_energy
+            ISE = NIBU * (n_channel * kernel_size * kernel_size) * activation_bitwidth * SRAM_access_energy
             WSE = NDPC * dot_product_unit_size * weight_bitwidth * SRAM_access_energy 
             
             OSWE = NDPC * n_dot_product_units * activation_bitwidth * SRAM_access_energy
