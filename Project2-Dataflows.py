@@ -51,15 +51,40 @@ def compute_layer_energy(dataflow, batch_size):
             #inputs are only loaded in once, so we do # of inputs / # of dpus and these are stationary
             #one input per dpu
             #kind of WS reversed 
+            
+            #each input is broadcasted throughout the array while each dpu holds  a separate filter
+            #it does not matter how many dpus there are because each dpu holds the same input vector
+            #for each row of inputs: (n_channel*kernel_size)/dpu_output_size chunks will be needed
+            #these input chunks are broadcasted in all 16 dpus 
+            #the corresponding filter chunks for each filter are streamed in for each input chunk and each dpu can hold a different filter
+            #the inputs are only updated after every single filter has passed through, meaning that this leads to a partial sum for num_filter pixels
+            #this means the inputs are updated for every output_size/num_filter pixels because the input stays stationary while it processes a partial sum of 
+            #num_filter pixels then it moves on 
+            #each valid input chunk can produce n_filter pixels
+            
             NIBU = math.ceil(n_channel * kernel_size/ n_dot_product_units) * math.ceil( n_filter / dot_product_unit_size)
-            NDPC = NIBU * H * W * batch_size
+            print("old",NIBU)
+            NIBU = math.ceil(n_channel*kernel_size*kernel_size/n_dot_product_units) * math.ceil((H*W)/n_filter) * batch_size
+            print(NIBU)
+            
+            #every time we update hte buffer for a valid output pixel, we want to do a dot product, and we do this for each image in the batch
+            #each input can only effect 9 -- filter size
+            #9 output pixels that depend on input pixel
+            NDPC = NIBU * kernel_size * kernel_size * batch_size
+            
             ISE = NIBU * n_dot_product_units * dot_product_unit_size * activation_bitwidth * SRAM_access_energy * batch_size
-            WSE = NDPC * dot_product_unit_size * weight_bitwidth * SRAM_access_energy
+            WSE = NDPC * dot_product_unit_size * weight_bitwidth * SRAM_access_energy * batch_size
+            
             OSWE = NDPC * n_dot_product_units * activation_bitwidth * SRAM_access_energy
             OSRE = (17/18) * OSWE
             OSE = OSRE + OSWE
             DPE = NDPC * n_dot_product_units * single_DPU_energy_per_cycle
             total_energy += WSE + ISE + OSE + DPE
+            total_weights = n_filter * n_channel * kernel_size * kernel_size
+            DRAM_energy = total_weights * weight_bitwidth * DRAM_access_energy  
+            total_energy += DRAM_energy
+            
+            #of weights * dram access energy at the end ?
 
         elif dataflow == 'OS':  #Output Stationary
             #we do not need NOBU because partial sums are kept
@@ -78,8 +103,8 @@ def compute_layer_energy(dataflow, batch_size):
 
 #1a
 compute_layer_energy('IS', 1)
-compute_layer_energy('IS', 256)
-compute_layer_energy('OS', 1)
-compute_layer_energy('OS', 256)
+# compute_layer_energy('IS', 256)
+# compute_layer_energy('OS', 1)
+# compute_layer_energy('OS', 256)
 
 
