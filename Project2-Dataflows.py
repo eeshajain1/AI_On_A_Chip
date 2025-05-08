@@ -66,10 +66,12 @@ def compute_layer_energy(dataflow, batch_size):
             NDPC = NIBU * kernel_size * kernel_size
             
             ISE = (H*W*n_channel) * activation_bitwidth * SRAM_access_energy * batch_size
+            print("ISE ", ISE)
             #ISE = dot_product_unit_size * NIBU * activation_bitwidth * SRAM_access_energy
             
             #weight buffer needs to be updated for every dot product unit computation (NDPC)
             WSE = NDPC * dot_product_unit_size * weight_bitwidth * SRAM_access_energy 
+            print("DES ", WSE)
             
             #dot product size is the size of the flattened filter: input_channels x kernel_size x kernel_size
             #and only the first dot product does not participate in the accumulation
@@ -90,11 +92,18 @@ def compute_layer_energy(dataflow, batch_size):
             #local to the array and only written back to SRAM 
             # after accumulation is complete
             #NDPC is equal to the number of buffer updates (I think), because we are not really reloading the outputs except for when we tae a dot product
+            NOBU = H * W #Num of output buffer updates 
             
-            NDPC = math.ceil(n_filter/n_dot_product_units) * H * W * batch_size #for each filter a full output is produced
+            #math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) is how many times the dot product needs to 
+            #be computed to produce one output, then you multiply by output size (H*W) and then by batch_size
+            NDPC =  math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) * H * W * batch_size
+            
+            #NDPC = math.ceil(n_filter/n_dot_product_units) * H * W * batch_size #for each filter a full output is produced
+            #both should both be the same because neither are stationary and are true for every output
             ISE = NDPC * dot_product_unit_size * activation_bitwidth * SRAM_access_energy
             WSE = NDPC * dot_product_unit_size * weight_bitwidth * SRAM_access_energy
-            OSE = NDPC * activation_bitwidth * SRAM_access_energy  #only write it once
+            
+            OSE = NDPC * activation_bitwidth * SRAM_access_energy  #only write it once, no need to read
             DPE = NDPC * n_dot_product_units * single_DPU_energy_per_cycle
             total_energy += ISE + WSE + OSE + DPE
             
@@ -184,7 +193,7 @@ compute_layer_energy('IS', 256)
 compute_latency_WS(1)
 compute_latency_WS(256)
 
-# compute_layer_energy('OS', 1)
-# compute_layer_energy('OS', 256)
+compute_layer_energy('OS', 1)
+compute_layer_energy('OS', 256)
 
 
