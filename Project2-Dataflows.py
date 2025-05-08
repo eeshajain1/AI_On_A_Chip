@@ -106,7 +106,7 @@ def compute_layer_energy(dataflow, batch_size):
 
     print(f"dataflow = {dataflow}, batch size = {batch_size}, energy = {total_energy} J")
 #1b latency
-def compute_latency_WS(dataflow, batch_size):
+def compute_latency_WS( batch_size):
     # DRAM_access_latency = 7000
     # weight_SRAM_load_latency = 6
     # activation_SRAM_load_latency = 3
@@ -163,6 +163,15 @@ def compute_latency_WS(dataflow, batch_size):
     # load weights from all layers into weight SRAM
     DRAM_latency =  DRAM_access_latency  
     total_latency += DRAM_latency
+    #total latency = cycles/operation
+    #clock period = seconds / cycle
+    latency_seconds = total_latency * clock_period
+    FPS = batch_size / latency_seconds
+   
+    
+    print(f"batch size = {batch_size}, latency = {latency_seconds} s, average FPS = {FPS}")
+  
+    return total_latency, FPS
 
         
         
@@ -172,6 +181,9 @@ def compute_latency_WS(dataflow, batch_size):
 #1a
 compute_layer_energy('IS', 1)
 compute_layer_energy('IS', 256)
+compute_latency_WS(1)
+compute_latency_WS(256)
+
 # compute_layer_energy('OS', 1)
 # compute_layer_energy('OS', 256)
 
