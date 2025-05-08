@@ -37,7 +37,7 @@ compute_latency = 2
 n_dot_product_units = 16
 dot_product_unit_size = 128
 
-
+#1a
 def compute_layer_energy(dataflow, batch_size):
     total_energy = 0
 
@@ -48,18 +48,12 @@ def compute_layer_energy(dataflow, batch_size):
         if dataflow == 'IS':  #Input Stationary
     
             
-            #each input is broadcasted throughout the array while each dpu holds  a separate filter
-            #it does not matter how many dpus there are because each dpu holds the same input vector
-            #for each row of inputs: (n_channel*kernel_size)/dpu_size chunks will be needed
-            #these input chunks are broadcasted in all 16 dpus 
-            #the corresponding filter chunks for each filter are streamed in for each input chunk and each dpu can hold a different filter
-            #the inputs are only updated after every single filter has passed through, meaning that this leads to a partial sum for num_filter pixels
-            #this means the inputs are updated for every output_size/num_filter pixels because the input stays stationary while it processes a partial sum of 
-            #num_filter pixels then it moves on 
-            #each valid input chunk can produce n_filter pixels
+  
             
    
-    
+            #the number of times the input buffers have to be updated is just the number of inputs over the dot product unit size
+            #recall that each dot product unit will have the same input vector as this vector is broadcasted to all the DPUs and 
+            #multiply by batch size bc we have to do this for every image
             NIBU = math.ceil(n_channel*H*W/dot_product_unit_size) * batch_size
             # NWBU = math.ceil(n_channel*kernel_size*kernel_size/dot_product_unit_size) * math.ceil(n_filter/n_dot_product_units) * batch_size
             # print(NWBU)
@@ -111,7 +105,69 @@ def compute_layer_energy(dataflow, batch_size):
     total_energy += DRAM_energy
 
     print(f"dataflow = {dataflow}, batch size = {batch_size}, energy = {total_energy} J")
+#1b latency
+def compute_latency_WS(dataflow, batch_size):
+    # DRAM_access_latency = 7000
+    # weight_SRAM_load_latency = 6
+    # activation_SRAM_load_latency = 3
+    # activation_SRAM_write_latency = 3
+    # compute_latency = 2
+    total_latency = 0
+    for i, (n_filter, n_channel, kernel_size, S) in enumerate(layers):
+        H = W = image_dims[i]
+        
+        # All latency number here are number of cycles required to do the operation. And for memory
+        # load it means the latency to read the all required data from the SRAM to buffer, same for
+        # memory write. Computation latency means the latency required to perform one dot product
+        # operation for all 16 dot product engines in parallel. DRAM latency means the latency required to
+        # load weights from all layers into weight SRAM
+        
+        #NWBU is the amount of weight buffer updates needed and weight buffer updates can be loaded simultaneously from the SRAM
+        #each weight only needs to be loaded once from the SRAM
+        #use this value to calculate how many weights and inputs need to be loaded at once and then calculate the latency for that
+        NWBU = math.ceil(n_filter / n_dot_product_units) * math.ceil(n_channel * kernel_size / dot_product_unit_size) * batch_size
+        
+        #this is the number of dot product computations needed 
+        #we will calculate the latency later for every dot product
+        NDPC = NWBU * H * W
+      
+        
+        #get how much latency there is in accessing each weight buffer 
+        #memory load is the latency to read all required data from SRAM into the buffer 
+        #so just multiply the number of buffer updates by the weight sram load latency
+        WS_parallel_latency = NWBU * weight_SRAM_load_latency
+   
+        #and then each input
+        IS_parallel_latency = NDPC * activation_SRAM_load_latency
+   
 
+        #get the max bc Weights and activations can be loaded in parallel since there is no dependency
+        WS_IS_latency = max(WS_parallel_latency, IS_parallel_latency)
+        
+        flat_dot_product_size = n_channel * kernel_size * kernel_size
+        #the output buffer needs to write to the activation SRAM every time the DPU produces results 
+        OSW_latency = NDPC * n_dot_product_units * activation_SRAM_write_latency
+        #need to read the activations for all times except the first psum chunk where no accumulation is needed
+        #cannot multiply by OSWE since we need to take into account the read vs write latency
+        OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+         
+        #for the number of dot products done per dpu * dot product units is how many computations we need to do
+        #Computation latency means the latency required to perform one dot product
+        # operation for all 16 dot product engines in parallel
+        DP_latency = NDPC * compute_latency
+        
+        total_latency += WS_IS_latency + OSW_latency + OSR_latency + DP_latency
+    
+    #remember that weights need to be loaded from the DRAM first into SRAM 
+    #DRAM latency means the latency required to
+    # load weights from all layers into weight SRAM
+    DRAM_latency =  DRAM_access_latency  
+    total_latency += DRAM_latency
+
+        
+        
+        
+    
 
 #1a
 compute_layer_energy('IS', 1)
