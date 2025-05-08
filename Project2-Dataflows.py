@@ -58,28 +58,36 @@ def compute_layer_energy(dataflow, batch_size):
             #num_filter pixels then it moves on 
             #each valid input chunk can produce n_filter pixels
             
-            #just multiply by batch_size here and it propogates to the rest
-            NIBU = math.ceil(n_channel*kernel_size*kernel_size/dot_product_unit_size) * math.ceil((H*W)/n_filter) * batch_size
-            print(NIBU)
+   
+    
+            NIBU = math.ceil(n_channel*H*W/dot_product_unit_size) * batch_size
             # NWBU = math.ceil(n_channel*kernel_size*kernel_size/dot_product_unit_size) * math.ceil(n_filter/n_dot_product_units) * batch_size
             # print(NWBU)
             
             #every time we update hte buffer for a valid output pixel, we want to do a dot product, and we do this for each image in the batch
             #each input can only effect 9 -- filter size
             #9 output pixels that depend on input pixel
-            NDPC = NIBU * n_filter
+            #each patch in the image has input pixel (assume adequate padding) and that input pixel is flattened for IM2COL kernel_size times, 
+            #so every time the inputs update, the input pixels have been used for dot products kernel_size times 
+            NDPC = NIBU * kernel_size * kernel_size
             
-            ISE = NIBU * (n_channel * kernel_size * kernel_size) * activation_bitwidth * SRAM_access_energy
+            ISE = (H*W*n_channel) * activation_bitwidth * SRAM_access_energy * batch_size
+            #ISE = dot_product_unit_size * NIBU * activation_bitwidth * SRAM_access_energy
+            
+            #weight buffer needs to be updated for every dot product unit computation (NDPC)
             WSE = NDPC * dot_product_unit_size * weight_bitwidth * SRAM_access_energy 
             
+            #dot product size is the size of the flattened filter: input_channels x kernel_size x kernel_size
+            #and only the first dot product does not participate in the accumulation
+            flat_dot_product_size = n_channel * kernel_size * kernel_size
             OSWE = NDPC * n_dot_product_units * activation_bitwidth * SRAM_access_energy
-            OSRE = (17/18) * OSWE
+            OSRE = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * OSWE
             OSE = OSRE + OSWE
+            
             DPE = NDPC * n_dot_product_units * single_DPU_energy_per_cycle
+            
             total_energy += WSE + ISE + OSE + DPE
-            total_weights = n_filter * n_channel * kernel_size * kernel_size
-            DRAM_energy = total_weights * weight_bitwidth * DRAM_access_energy  
-            total_energy += DRAM_energy
+
             
             #of weights * dram access energy at the end ?
 
@@ -95,13 +103,19 @@ def compute_layer_energy(dataflow, batch_size):
             OSE = NDPC * activation_bitwidth * SRAM_access_energy  #only write it once
             DPE = NDPC * n_dot_product_units * single_DPU_energy_per_cycle
             total_energy += ISE + WSE + OSE + DPE
+            
+    #repeat above for all layers then add the dram ready energy to move weights from dram to sram 
+    #this is just done after all the final weights are calculated
+    total_weights = n_filter * (n_channel * kernel_size * kernel_size)
+    DRAM_energy = total_weights * weight_bitwidth * DRAM_access_energy  
+    total_energy += DRAM_energy
 
     print(f"dataflow = {dataflow}, batch size = {batch_size}, energy = {total_energy} J")
 
 
 #1a
 compute_layer_energy('IS', 1)
-# compute_layer_energy('IS', 256)
+compute_layer_energy('IS', 256)
 # compute_layer_energy('OS', 1)
 # compute_layer_energy('OS', 256)
 
