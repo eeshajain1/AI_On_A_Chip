@@ -112,6 +112,7 @@ def compute_layer_energy(dataflow, batch_size):
             
             #math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) is how many times the dot product needs to 
             #be computed to produce one output, then you multiply by output size (H*W) and then by batch_size
+            #however if the number of filters are greater than the number of dpus, then we need to account for that as well 
             NDPC =  math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) *  (n_filter/n_dot_product_units) * H * W * batch_size
             
             #neither are stationary and are true for every output
