@@ -42,6 +42,7 @@ dot_product_unit_size = 128
 #PLEASE NOTE THAT I HAVE DEFINED KERNEL SIZE TO BE 3 SO KERNEL SIZE X KERNEL SIZE = 9 IN THE NOTES IT JUST MAKES KERNEL SIZE = 9
 def compute_layer_energy(dataflow, batch_size):
     total_energy = 0
+    total_weights = 0
 
     for i, (n_filter, n_channel, kernel_size, S) in enumerate(layers):
         H = W = image_dims[i]
@@ -135,9 +136,10 @@ def compute_layer_energy(dataflow, batch_size):
             
             total_energy += ISE + WSE + OSE + DPE
             
-    #repeat above for all layers then add the dram ready energy to move weights from dram to sram 
-    #this is just done after all the final weights are calculated
-    total_weights = n_filter * (n_channel * kernel_size * kernel_size)
+        #repeat above for all layers then add the dram ready energy to move weights from dram to sram 
+        #this is just done after all the final weights are calculated
+        total_weights += n_filter * (n_channel * kernel_size * kernel_size)
+        # print(f"total weights = {total_weights}")
     DRAM_energy = total_weights * weight_bitwidth * DRAM_access_energy  
     total_energy += DRAM_energy
 
