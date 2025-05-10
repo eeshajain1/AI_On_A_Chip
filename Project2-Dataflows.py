@@ -166,7 +166,7 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
         #NWBU is the amount of weight buffer updates needed total for the entire layer
         #each weight only needs to be loaded once from the SRAM
         #use this value to calculate how many weights and inputs need to be loaded at once and then calculate the latency for that
-        NWBU = math.ceil(n_filter / n_dot_product_units) * math.ceil(n_channel * kernel_size / dot_product_unit_size) * batch_size
+        NWBU = math.ceil(n_filter / n_dot_product_units) * math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) * batch_size
         
         #this is the number of dot product computation cycles needed per dpu
         #we will calculate the latency later for every dot product
