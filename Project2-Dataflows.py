@@ -233,7 +233,7 @@ def compute_latency_WS_parallel(batch_size, dot_product_unit_size=128):
         
         #read, compuation, and write are pipelined so we just take the maximum of this
       
-        NWBU = math.ceil(n_filter / n_dot_product_units) * math.ceil(n_channel * kernel_size / dot_product_unit_size) * batch_size
+        NWBU = math.ceil(n_filter / n_dot_product_units) * math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) * batch_size
         NDPC = NWBU * H * W
       
         WS_parallel_latency = NWBU * weight_SRAM_load_latency
