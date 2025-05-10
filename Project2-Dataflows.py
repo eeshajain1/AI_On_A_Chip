@@ -250,7 +250,7 @@ def compute_latency_WS_parallel(batch_size, dot_product_unit_size=128):
         #DP latency is the compute latency
         DP_latency = NDPC * compute_latency
         
-        read_latency = WS_parallel_latency + IS_parallel_latency + OSR_latency
+        read_latency = max(WS_parallel_latency, IS_parallel_latency + OSR_latency)
         write_latency = OSW_latency
         
         pipelined_latency = max(read_latency, write_latency, DP_latency)
