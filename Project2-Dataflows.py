@@ -182,10 +182,6 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
         #and then each input -- every time a dot product is computed we update the inputs
         # do not need to take into account number of dpus bc the input vector is broadcasted
         IS_parallel_latency = NDPC * activation_SRAM_load_latency
-   
-
-        #get the max bc Weights and activations can be loaded in parallel since there is no dependency
-        WS_IS_latency = max(WS_parallel_latency, IS_parallel_latency)
         
         
         #the output buffer needs to write to the activation SRAM every time the DPU produces results 
@@ -196,13 +192,16 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
             OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
         else:
             OSR_latency = 0
+        
+        #get the max bc Weights and activations can be loaded in parallel since there is no dependency
+        read_write_latency = max(WS_parallel_latency, IS_parallel_latency + OSR_latency)
          
         #for the number of dot products done per dpu * dot product units is how many computations we need to do
         #Computation latency means the latency required to perform one dot product
         # operation for all 16 dot product engines in parallel
         DP_latency = NDPC * compute_latency
         
-        total_latency += WS_IS_latency + OSW_latency + OSR_latency + DP_latency
+        total_latency += read_write_latency + OSW_latency + DP_latency
     
     #remember that weights need to be loaded from the DRAM first into SRAM 
     #DRAM latency means the latency required to
