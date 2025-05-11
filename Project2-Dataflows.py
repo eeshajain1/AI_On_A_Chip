@@ -242,10 +242,14 @@ def compute_latency_WS_parallel(batch_size, dot_product_unit_size=128):
         NWBU = math.ceil(n_filter / n_dot_product_units) * math.ceil(n_channel * kernel_size * kernel_size / dot_product_unit_size) * batch_size
         NDPC = NWBU * H * W
       
+        #weights updated every time the weight buffer updates
         WS_parallel_latency = NWBU * weight_SRAM_load_latency
    
+        #inputs updated every time a dot product is compute (dont take into account number of dpus since each vector is broadcasted)
         IS_parallel_latency = NDPC * activation_SRAM_load_latency
         
+        #output is written to the sram every time a dot product is computed for each dot product unit
+        #the output is different for every dot product unit
         OSW_latency = NDPC * n_dot_product_units * activation_SRAM_write_latency
 
         if(flat_dot_product_size > dot_product_unit_size): 
