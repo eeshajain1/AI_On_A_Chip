@@ -186,10 +186,16 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
         
         #the output buffer needs to write to the activation SRAM every time the DPU produces results 
         OSW_latency = NDPC * n_dot_product_units * activation_SRAM_write_latency
+        
         #need to read the activations for all times except the first psum chunk where no accumulation is needed
         #cannot multiply by OSWE since we need to take into account the read vs write latency
+        #subtract 1 
         if(flat_dot_product_size > dot_product_unit_size): 
-            OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+            #OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+            
+            #NDPC is the amount of times we need to write to the activation SRAM, and all times but 1, we also need to read this value
+            OSR_latency = ( NDPC * n_dot_product_units - 1 ) * activation_SRAM_load_latency
+            
         else:
             OSR_latency = 0
         
@@ -212,6 +218,7 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
     #total latency => cycles
     #clock period => seconds / cycle
     #batch size -- each image is a frame
+    print(total_latency)
     latency_seconds = total_latency * clock_period
     FPS = batch_size / latency_seconds
    
@@ -243,7 +250,8 @@ def compute_latency_WS_parallel(batch_size, dot_product_unit_size=128):
         OSW_latency = NDPC * n_dot_product_units * activation_SRAM_write_latency
 
         if(flat_dot_product_size > dot_product_unit_size): 
-            OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+            #OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+            OSR_latency = ( NDPC * n_dot_product_units - 1 ) * activation_SRAM_load_latency
         else:
             OSR_latency = 0
          
