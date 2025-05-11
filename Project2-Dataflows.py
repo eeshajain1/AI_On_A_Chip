@@ -218,7 +218,6 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
     #total latency => cycles
     #clock period => seconds / cycle
     #batch size -- each image is a frame
-    print(total_latency)
     latency_seconds = total_latency * clock_period
     FPS = batch_size / latency_seconds
    
