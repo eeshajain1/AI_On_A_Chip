@@ -185,6 +185,8 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
         
         
         #the output buffer needs to write to the activation SRAM every time the DPU produces results 
+        #output is written to the sram every time a dot product is computed for each dot product unit
+        #the output is different for every dot product unit
         OSW_latency = NDPC * n_dot_product_units * activation_SRAM_write_latency
         
         #need to read the activations for all times except the first psum chunk where no accumulation is needed
