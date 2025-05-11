@@ -157,7 +157,6 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
         H = W = image_dims[i]
         flat_dot_product_size = n_channel * kernel_size * kernel_size
         
-        
         # All latency number here are number of cycles required to do the operation. And for memory
         # load it means the latency to read the all required data from the SRAM to buffer, same for
         # memory write. Computation latency means the latency required to perform one dot product
@@ -314,6 +313,13 @@ print(f"dot product unit size = {1024}, average FPS = {FPS1024}")
 _, FPS2048 = compute_latency_WS(1, 2048)
 print(f"dot product unit size = {2048}, average FPS = {FPS2048}")
 
+# _, FPS2304 = compute_latency_WS(1, 2304)
+# print(f"dot product unit size = {2304}, average FPS = {FPS2304}")
+# _, FPS3000 = compute_latency_WS(1, 3000)
+# print(f"dot product unit size = {1024}, average FPS = {FPS1024}")
+# _, FPS3500 = compute_latency_WS(1, 3500)
+# print(f"dot product unit size = {3500}, average FPS = {FPS3500}")
+
 dot_product_sizes = [128, 256, 512, 1024, 2048]
 fps_values = [FPS128, FPS256, FPS512, FPS1024, FPS2048]  # replace with your actual FPS values
 
@@ -328,6 +334,13 @@ _, FPS1024 = compute_latency_WS(256, 1024)
 print(f"dot product unit size = {1024}, average FPS = {FPS1024}")
 _, FPS2048 = compute_latency_WS(256, 2048)
 print(f"dot product unit size = {2048}, average FPS = {FPS2048}")
+
+# _, FPS2304 = compute_latency_WS(256, 2304)
+# print(f"dot product unit size = {2304}, average FPS = {FPS2304}")
+# _, FPS3000 = compute_latency_WS(256, 3000)
+# print(f"dot product unit size = {1024}, average FPS = {FPS1024}")
+# _, FPS3500 = compute_latency_WS(2556, 3500)
+# print(f"dot product unit size = {3500}, average FPS = {FPS3500}")
 
 
 dot_product_sizes = [128, 256, 512, 1024, 2048]
@@ -353,7 +366,7 @@ plt.tight_layout()
 
 
 #PART D
-print("1d)")
+print("\n1d)")
 compute_latency_WS_parallel(1)
 compute_latency_WS_parallel(256)
 print("\n")
