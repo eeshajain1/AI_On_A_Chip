@@ -192,17 +192,17 @@ def compute_latency_WS(batch_size, dot_product_unit_size=128):
         #need to read the activations for all times except the first psum chunk where no accumulation is needed
         #cannot multiply by OSWE since we need to take into account the read vs write latency
         #subtract 1 
-        if(flat_dot_product_size > dot_product_unit_size): 
-            #OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+        # if(flat_dot_product_size > dot_product_unit_size): 
+        #     #OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
             
-            #NDPC is the amount of times we need to write to the activation SRAM, and all times but 1, we also need to read this value
-            OSR_latency = ( NDPC * n_dot_product_units - 1 ) * activation_SRAM_load_latency
+        #     #NDPC is the amount of times we need to write to the activation SRAM, and all times but 1, we also need to read this value
+        #     OSR_latency = ( NDPC * n_dot_product_units - 1 ) * activation_SRAM_load_latency
             
-        else:
-            OSR_latency = 0
+        # else:
+        #     OSR_latency = 0
         
         #get the max bc Weights and activations can be loaded in parallel since there is no dependency
-        read_latency = max(WS_parallel_latency, IS_parallel_latency + OSR_latency)
+        read_latency = max(WS_parallel_latency, IS_parallel_latency + OSW_latency)
          
         #for the number of dot products done per dpu * dot product units is how many computations we need to do
         #Computation latency means the latency required to perform one dot product
@@ -254,16 +254,16 @@ def compute_latency_WS_parallel(batch_size, dot_product_unit_size=128):
         #the output is different for every dot product unit
         OSW_latency = NDPC * n_dot_product_units * activation_SRAM_write_latency
 
-        if(flat_dot_product_size > dot_product_unit_size): 
-            #OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
-            OSR_latency = ( NDPC * n_dot_product_units - 1 ) * activation_SRAM_load_latency
-        else:
-            OSR_latency = 0
+        # if(flat_dot_product_size > dot_product_unit_size): 
+        #     #OSR_latency = ((flat_dot_product_size - dot_product_unit_size)/(flat_dot_product_size)) * NDPC * n_dot_product_units * activation_SRAM_load_latency
+        #     OSR_latency = ( NDPC * n_dot_product_units - 1 ) * activation_SRAM_load_latency
+        # else:
+        #     OSR_latency = 0
          
         #DP latency is the compute latency
         DP_latency = NDPC * compute_latency
         
-        read_latency = max(WS_parallel_latency, IS_parallel_latency + OSR_latency)
+        read_latency = max(WS_parallel_latency, IS_parallel_latency + OSW_latency)
         write_latency = OSW_latency
         
         pipelined_latency = max(read_latency, write_latency, DP_latency)
