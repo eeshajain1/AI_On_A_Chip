@@ -12,7 +12,7 @@ BYTES_PER_FP16 = 2
 
 # CNN models
 model1 = [
-    # number of filers, numer of input channels, fx, fy, input activation dimension
+    # number of filers, number of input channels, fx, fy, input activation dimension
     # kernel size is fx x fy
     {"filters": 128, "in_ch": 3, "fx": 3, "fy": 3, "in_dim": 32},
     {"filters": 128, "in_ch": 128, "fx": 3, "fy": 3, "in_dim": 30},
@@ -61,14 +61,14 @@ def tensor_parallelism(model, num_inputs):
     total_latency = latency * num_inputs
     total_comm *= num_inputs
 
-    return latency*1000, total_comm/1024        # conver the units to ms and KB
+    return total_latency*1000, total_comm/1024        # convert the units to ms and KB
 
 """
 - Each node computes a layer
-- Layers have depedencies, the output of one layer is the input of the next
+- Layers have dependencies, the output of one layer is the input of the next
     - the total latency = startup time + (N-1)*max layer time
-- After each layer, output is sent to the next node
-- For one input: full pieline time = sume of all layers
+- After each layer, the output is sent to the next node
+- For one input: full pipeline time = sum of all layers
 """
 def pipeline_parallelism(model, num_inputs):
     total_comm = 0
@@ -84,7 +84,7 @@ def pipeline_parallelism(model, num_inputs):
     total_latency = sum(layer_latencies) + (num_inputs - 1) * max(layer_latencies)
     total_comm *= num_inputs
 
-    return total_latency*1000, total_comm / 1024    # conver the units to ms and KB
+    return total_latency*1000, total_comm / 1024    # convert the units to ms and KB
 
 # Q1 - single input
 tp_1_latency, tp_1_traffic = tensor_parallelism(model1, 1)
